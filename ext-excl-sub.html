@@ -1,0 +1,145 @@
+<head>
+  <title>ext-excl-sub</title>
+    <style>
+        body { font-size: 20px; }
+        button {display: block; margin-bottom: 20px; font-size: 20px; padding: 10px; border-radius: 10px;}
+        p {max-width: 640px;}
+    </style>
+</head>
+
+<body>
+
+    {{> content}}
+
+</body>
+
+<template name="content">
+
+    <h1>
+        Problem with reusing subscriptions
+    </h1>
+
+    <p>
+        Something in Meteor doesn't extend already received documents with new fields from later subscriptions.
+    </p>
+
+    <h2>
+        What we have?
+    </h2>
+
+    <p>
+        «Posts» collection with one post document:
+    </p>
+
+    {{{gist "MaximDubrovin" "8151ae939b3d1f388b70"}}}
+
+    <p>
+        Post title is a document which contains <em>published</em> field and <em>unpublished</em> field (for title draft version).
+    </p>
+
+    <h2>Scenario where problem emerges:</h2>
+
+    <p>
+        <em>See MongoInspector at the bottom-left corner to track what data available on the client.</em>
+    </p>
+
+    <p>1. Click the button and subscribe to Posts with excluded «title.unpublished» field:</p>
+
+    <button onclick="Meteor.subscribe('posts_unpublished_fields_explicitly_excluded');">
+        Meteor.subscribe('posts_unpublished_fields_explicitly_excluded')
+    </button>
+
+    {{{gist "MaximDubrovin" "7da40dc3264b184ddd7c"}}}
+
+    <p>
+        See MongoInspector: no «title.unpublished» field for the title.
+    </p>
+
+    <p>2. Click the button and subscribe to Posts without any fields exclusion:</p>
+
+    <button onclick="Meteor.subscribe('posts_no_fields_exclusion_or_inclusion');">
+        Meteor.subscribe('posts_no_fields_exclusion_or_inclusion')
+    </button>
+
+    {{{gist "MaximDubrovin" "a8d5f5e9c227492c274e"}}}
+
+    <p>
+        See MongoInspector: no «title.unpublished» field for the title, but subscription includes it. Why?
+    </p>
+
+    <p>
+        3. Click the button and subscribe to Posts with explicitly included «title.unpublished» field:
+    </p>
+
+    <button onclick="Meteor.subscribe('posts_unpublished_fields_explicitly_included');">
+        Meteor.subscribe('posts_unpublished_fields_explicitly_included')
+    </button>
+
+    {{{gist "MaximDubrovin" "ccb2edfbd33e8161b294"}}}
+
+    <p>
+        See MongoInspector: no «title.unpublished» field for the title but subscription includes it. Why?
+    </p>
+
+    <hr/>
+
+    <p>
+        Note: on step 2 or 3 after step 1 we didn't unsubscribe from step 1 subscription.
+        We wanted to reuse it and just extend with «title.unpublished» field. It didn't happen.
+    </p>
+
+    <h2>Possible explanations</h2>
+
+    <p>
+        1. Meteor treats fields exclusion rule as a strict rule and if something was excluded in earlier subscription
+        then while this subscription still alive no other subscription can get that excluded data.
+    </p>
+
+    <p>
+        If so then try to do step 2 or 3 and then step 1. If theory above is valid then subscription on step 1 should remove «title.unpublished» field and add only «title.published» field. But no one of that happened.
+    </p>
+
+    <p>
+        2. It seems that Meteor ignores later subscriptions that includes/excludes fields of the already received document.
+    </p>
+
+    <p>
+        Theory 1: Meteor do it on purpose which is unknown.
+    </p>
+
+    <p>
+        Or Meteor simply doesn't have mechanism to compare which fields of the already received documents should be extended/excluded after new subscription.
+    </p>
+
+    <p>
+        So we have earlier subscription data in favor of later subscription data.
+    </p>
+
+    <h2>
+        Problem which you can face when building app:
+    </h2>
+
+    <p>
+        For example you logged in user that created a post.
+        You are on public version of that post (subscribed to public post data). www.blog.com/:postId
+    </p>
+
+    <p>
+        Then you decide to edit it and go to www.blog.com/:postId/edit route.
+        You don't want to unsubscribe from post data you already have. It anyway be useful in near feature.
+        You want to extend it with something like «title.unpublished» and «content.unpublished»
+        since on www.blog.com/:postId/edit you want to see draft version of the post.
+    </p>
+
+    <p>But you can't do it.</p>
+
+    <p>
+        You need to completely unsubscribe from previous data and then subscribe again but with included «.unpublished» fields.
+    </p>
+
+    <p>
+        It doesn't matter if you use Meteor.subscribe like in that example or meteorhacks:subs-manager.
+        Something in Meteor doesn't extend already received documents with new fields.
+    </p>
+
+</template>
